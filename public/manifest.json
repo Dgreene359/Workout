@@ -1,0 +1,16 @@
+{
+  "name": "Garage Strength",
+  "short_name": "Garage",
+  "description": "Phone-friendly workout planning and progress tracking.",
+  "start_url": "/today",
+  "display": "standalone",
+  "background_color": "#fbfaf6",
+  "theme_color": "#227c75",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

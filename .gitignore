@@ -1,0 +1,9 @@
+.next
+node_modules
+.pnpm-store
+.upload-git
+.env*.local
+out
+dist
+coverage
+*.tsbuildinfo
