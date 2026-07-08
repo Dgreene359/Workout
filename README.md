@@ -20,7 +20,7 @@ A phone-friendly workout tracker built with Next.js, TypeScript, Tailwind, and S
 pnpm install
 ```
 
-2. Optional Supabase setup:
+2. Optional local Supabase setup:
 
 ```bash
 cp .env.example .env.local
@@ -32,6 +32,8 @@ Add:
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
+
+The deployed app also has public Supabase fallback values in code so Vercel can connect even before environment variables are added. You can still add Vercel environment variables later to override them.
 
 3. In Supabase, run `supabase/schema.sql` in the SQL editor.
 
