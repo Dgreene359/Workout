@@ -1,10 +1,16 @@
+import { redirect } from "next/navigation";
 import { Dumbbell, Flame, Timer } from "lucide-react";
 import { SessionLogger } from "@/components/session-logger";
 import { StatCard } from "@/components/stat-card";
-import { workoutTemplates } from "@/lib/seed-data";
+import { getAppData } from "@/lib/data";
+import { getProgressSummary } from "@/lib/progress";
 
-export default function TodayPage() {
-  const template = workoutTemplates[0];
+export default async function TodayPage() {
+  const data = await getAppData();
+  if (data.configured && data.userId && !data.profile?.setupCompleted) redirect("/onboarding");
+  const template = data.templates[0];
+  if (!template) redirect("/onboarding");
+  const summary = getProgressSummary(data.sessions);
 
   return (
     <div className="space-y-5">
@@ -19,11 +25,11 @@ export default function TodayPage() {
         </div>
       </header>
       <div className="grid grid-cols-3 gap-2">
-        <StatCard label="Week" value="2/4" />
-        <StatCard label="Volume" value="7.1k" />
-        <StatCard label="Streak" value="2" />
+        <StatCard label="Week" value={`${summary.completedThisWeek}/${template.trainingDays}`} />
+        <StatCard label="Volume" value={`${Math.round(summary.totalVolume / 100) / 10}k`} />
+        <StatCard label="Cardio" value={`${summary.cardioMinutes}m`} />
       </div>
-      <SessionLogger template={template} />
+      <SessionLogger template={template} sessions={data.sessions} />
     </div>
   );
 }

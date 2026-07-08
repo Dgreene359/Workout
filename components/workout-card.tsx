@@ -1,8 +1,9 @@
 import { Clock, Dumbbell, Repeat2 } from "lucide-react";
 import { getExercise, getSubstitutions } from "@/lib/seed-data";
-import type { WorkoutTemplate } from "@/lib/types";
+import { SubstitutionForm } from "@/components/substitution-form";
+import type { Equipment, WorkoutTemplate } from "@/lib/types";
 
-export function WorkoutCard({ template }: { template: WorkoutTemplate }) {
+export function WorkoutCard({ template, equipment = [] }: { template: WorkoutTemplate; equipment?: Equipment[] }) {
   return (
     <article className="rounded-md bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
@@ -19,7 +20,7 @@ export function WorkoutCard({ template }: { template: WorkoutTemplate }) {
         {template.exercises.map((item) => {
           const exercise = getExercise(item.exerciseId);
           if (!exercise) return null;
-          const substitutions = getSubstitutions(item.exerciseId);
+          const substitutions = getSubstitutions(item.exerciseId, equipment);
           return (
             <div key={`${template.id}-${item.exerciseId}`} className="rounded-md border border-ink/10 p-3">
               <div className="flex items-start justify-between gap-3">
@@ -37,6 +38,7 @@ export function WorkoutCard({ template }: { template: WorkoutTemplate }) {
                   Swap: {substitutions.slice(0, 2).map((sub) => sub.name).join(", ")}
                 </p>
               ) : null}
+              <SubstitutionForm templateExerciseId={item.id} exerciseId={item.exerciseId} equipment={equipment} />
             </div>
           );
         })}

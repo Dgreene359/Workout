@@ -4,12 +4,13 @@ A phone-friendly workout tracker built with Next.js, TypeScript, Tailwind, and S
 
 ## What is included
 
-- Mobile-first screens for Today, Plan, History, Progress, and Settings.
-- Seeded exercise library based on the old tracker plus the current garage gym.
-- Four-day balanced strength plan with autoregulated progression cues.
-- Supabase magic-link login when environment keys are configured.
-- Supabase schema with user-owned tables and row-level security.
-- Preview/demo mode when Supabase keys are not configured.
+- Mobile-first screens for Today, Plan, Exercise Library, History, Progress, and Settings.
+- Guided setup that generates a 3, 4, 5, or 6 day plan from selected equipment.
+- Exercise library with tracking type, substitutions, form notes, and YouTube demo links.
+- Supabase magic-link login and saved workout sessions.
+- Strength logging with manual first weights and +/- controls for later workouts.
+- Time-based conditioning logs with optional distance and effort.
+- Supabase schema with global-readable library support, user-owned plans, and row-level security.
 
 ## Local setup
 
@@ -34,7 +35,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 
 3. In Supabase, run `supabase/schema.sql` in the SQL editor.
 
-4. Start the app:
+4. In Supabase Auth settings, add your local and deployed callback URLs:
+
+```text
+http://localhost:3000/auth/callback
+https://your-domain.com/auth/callback
+```
+
+5. Start the app:
 
 ```bash
 pnpm dev
@@ -42,7 +50,7 @@ pnpm dev
 
 ## Deployment
 
-Deploy the repository to Vercel and add the same two Supabase environment variables. In Supabase Auth settings, add the Vercel URL as an allowed redirect URL and include:
+Deploy the repository to Vercel and add the same two Supabase environment variables. New users are sent through guided setup after sign-in.
 
 ```text
 https://your-domain.com/auth/callback

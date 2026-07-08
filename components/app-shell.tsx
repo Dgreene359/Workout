@@ -3,12 +3,13 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, Dumbbell, History, Settings } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, Dumbbell, History, Settings } from "lucide-react";
 import clsx from "clsx";
 
 const navItems: Array<{ href: Route; label: string; icon: typeof Dumbbell }> = [
   { href: "/today", label: "Today", icon: Dumbbell },
   { href: "/plan", label: "Plan", icon: CalendarDays },
+  { href: "/library", label: "Library", icon: BookOpen },
   { href: "/history", label: "History", icon: History },
   { href: "/progress", label: "Progress", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings }
@@ -23,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-ink/10 bg-paper/95 px-2 pb-2 pt-2 backdrop-blur">
-        <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1 safe-bottom">
+        <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1 safe-bottom">
           {navItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
