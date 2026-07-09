@@ -7,6 +7,10 @@ create table if not exists public.profiles (
   training_days integer check (training_days in (3, 4, 5, 6)),
   setup_completed boolean not null default false,
   active_plan_id uuid,
+  sex text,
+  age_range text,
+  goals text[] not null default '{}',
+  primary_goal text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -36,6 +40,7 @@ create table if not exists public.exercises (
   default_rep_min integer not null default 8,
   default_rep_max integer not null default 12,
   default_duration_seconds integer,
+  track_fields text[] not null default '{"weight","reps","effort","notes"}',
   substitution_group text not null,
   demo_url text,
   instructions text,
@@ -61,9 +66,16 @@ create table if not exists public.workout_templates (
   unique (user_id, slug)
 );
 
-alter table public.profiles
-  add constraint profiles_active_plan_fk
-  foreign key (active_plan_id) references public.workout_templates(id) on delete set null;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_active_plan_fk'
+  ) then
+    alter table public.profiles
+      add constraint profiles_active_plan_fk
+      foreign key (active_plan_id) references public.workout_templates(id) on delete set null;
+  end if;
+end $$;
 
 create table if not exists public.template_exercises (
   id uuid primary key default gen_random_uuid(),
@@ -118,12 +130,22 @@ create table if not exists public.cardio_logs (
   modality text not null,
   duration_minutes integer not null,
   distance numeric(7,2),
+  distance_unit text,
   effort numeric(3,1),
   intervals jsonb,
+  custom_values jsonb,
   notes text,
   completed boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists sex text;
+alter table public.profiles add column if not exists age_range text;
+alter table public.profiles add column if not exists goals text[] not null default '{}';
+alter table public.profiles add column if not exists primary_goal text;
+alter table public.exercises add column if not exists track_fields text[] not null default '{"weight","reps","effort","notes"}';
+alter table public.cardio_logs add column if not exists distance_unit text;
+alter table public.cardio_logs add column if not exists custom_values jsonb;
 
 create table if not exists public.body_metrics (
   id uuid primary key default gen_random_uuid(),

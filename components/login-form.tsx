@@ -51,9 +51,7 @@ export function LoginForm() {
         {loading ? "Sending..." : "Send magic link"}
       </button>
       {message ? <p className="rounded-md bg-paper p-3 text-sm leading-6 text-ink/70">{message}</p> : null}
-      <a className="block text-center text-sm font-bold text-teal" href="/today">
-        Continue in preview mode
-      </a>
+      <p className="text-center text-xs leading-5 text-ink/55">You should only need the magic link when this browser is signed out or the session expires.</p>
     </form>
   );
 }

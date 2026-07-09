@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getExerciseFromCatalog } from "@/lib/exercise-utils";
 import { exercises, generatePlan, getExercise, workoutTemplates } from "@/lib/seed-data";
-import type { ConditioningLog, Equipment, GeneratedPlan, StrengthSetLog, WorkoutSession, WorkoutTemplate } from "@/lib/types";
+import type { AgeRange, ConditioningLog, Equipment, Exercise, GeneratedPlan, Goal, Sex, StrengthSetLog, WorkoutSession, WorkoutTemplate } from "@/lib/types";
 
 type Supabase = NonNullable<Awaited<ReturnType<typeof createClient>>>;
 
@@ -10,6 +11,10 @@ export type AppProfile = {
   setupCompleted: boolean;
   trainingDays: 3 | 4 | 5 | 6 | null;
   activePlanId: string | null;
+  sex: Sex | null;
+  ageRange: AgeRange | null;
+  goals: Goal[];
+  primaryGoal: Goal | null;
 };
 
 export type AppData = {
@@ -18,6 +23,8 @@ export type AppData = {
   equipment: Equipment[];
   templates: WorkoutTemplate[];
   sessions: WorkoutSession[];
+  exerciseCatalog: Exercise[];
+  todayTemplate: WorkoutTemplate | null;
   configured: boolean;
 };
 
@@ -30,6 +37,8 @@ export async function getAppData(): Promise<AppData> {
       equipment: ["bodyweight", "dumbbell", "kettlebell", "barbell", "plates", "squat rack", "bench", "pull-up bar", "functional trainer", "rower", "treadmill", "bike", "box"],
       templates: workoutTemplates,
       sessions: [],
+      exerciseCatalog: exercises,
+      todayTemplate: workoutTemplates[0] ?? null,
       configured: false
     };
   }
@@ -39,19 +48,22 @@ export async function getAppData(): Promise<AppData> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { userId: null, profile: null, equipment: [], templates: [], sessions: [], configured: true };
+    return { userId: null, profile: null, equipment: [], templates: [], sessions: [], exerciseCatalog: exercises, todayTemplate: null, configured: true };
   }
 
-  const [{ data: profileRow }, { data: equipmentRows }, { data: templateRows }, { data: sessionRows }] = await Promise.all([
+  const [{ data: profileRow }, { data: equipmentRows }, { data: templateRows }, { data: sessionRows }, { data: customExerciseRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase.from("equipment").select("*").eq("user_id", user.id).order("name"),
-    supabase.from("workout_templates").select("*, template_exercises(*)").eq("user_id", user.id).eq("active", true).order("created_at"),
+    supabase.from("workout_templates").select("*, template_exercises(*)").eq("user_id", user.id).eq("active", true).order("day_type"),
     supabase
       .from("workout_sessions")
       .select("*, set_logs(*), cardio_logs(*)")
       .eq("user_id", user.id)
       .order("session_date", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(30)
+    ,
+    supabase.from("exercises").select("*").eq("user_id", user.id).order("name")
   ]);
 
   const profile: AppProfile | null = profileRow
@@ -60,28 +72,47 @@ export async function getAppData(): Promise<AppData> {
         displayName: profileRow.display_name,
         setupCompleted: profileRow.setup_completed,
         trainingDays: profileRow.training_days,
-        activePlanId: profileRow.active_plan_id
+        activePlanId: profileRow.active_plan_id,
+        sex: profileRow.sex,
+        ageRange: profileRow.age_range,
+        goals: profileRow.goals ?? [],
+        primaryGoal: profileRow.primary_goal
       }
     : null;
+  const templates = (templateRows ?? []).map(mapTemplate).sort(compareTemplates);
+  const sessions = (sessionRows ?? []).map(mapSession);
+  const exerciseCatalog = [...exercises, ...(customExerciseRows ?? []).map(mapExercise)];
 
   return {
     userId: user.id,
     profile,
     equipment: ((equipmentRows ?? []).map((row) => row.name) as Equipment[]) ?? [],
-    templates: (templateRows ?? []).map(mapTemplate),
-    sessions: (sessionRows ?? []).map(mapSession),
+    templates,
+    sessions,
+    exerciseCatalog,
+    todayTemplate: getNextTemplate(templates, sessions),
     configured: true
   };
 }
 
-export async function createGeneratedPlanForUser(supabase: Supabase, userId: string, equipment: Equipment[], trainingDays: 3 | 4 | 5 | 6) {
-  const plan = generatePlan({ equipment, trainingDays });
+export async function createGeneratedPlanForUser(
+  supabase: Supabase,
+  userId: string,
+  equipment: Equipment[],
+  trainingDays: 3 | 4 | 5 | 6,
+  profile: { sex?: Sex | null; ageRange?: AgeRange | null; goals?: Goal[]; primaryGoal?: Goal | null } = {}
+) {
+  const plan = generatePlan({ equipment, trainingDays, goals: profile.goals, primaryGoal: profile.primaryGoal });
 
   await supabase.from("profiles").upsert({
     id: userId,
     display_name: "Me",
     units: "lb",
-    setup_completed: false
+    setup_completed: false,
+    sex: profile.sex ?? null,
+    age_range: profile.ageRange ?? null,
+    goals: profile.goals ?? [],
+    primary_goal: profile.primaryGoal ?? null
   });
 
   await supabase.from("equipment").delete().eq("user_id", userId);
@@ -142,6 +173,10 @@ export async function createGeneratedPlanForUser(supabase: Supabase, userId: str
       setup_completed: true,
       training_days: trainingDays,
       active_plan_id: firstTemplateId,
+      sex: profile.sex ?? null,
+      age_range: profile.ageRange ?? null,
+      goals: profile.goals ?? [],
+      primary_goal: profile.primaryGoal ?? null,
       updated_at: new Date().toISOString()
     })
     .eq("id", userId);
@@ -180,6 +215,31 @@ function mapTemplate(row: any): WorkoutTemplate {
   };
 }
 
+function mapExercise(row: any): Exercise {
+  return {
+    id: row.slug,
+    slug: row.slug,
+    name: row.name,
+    category: row.category,
+    trackType: row.track_type,
+    movementPattern: row.movement_pattern,
+    muscleFocus: row.muscle_focus ?? [],
+    equipment: row.equipment ?? ["bodyweight"],
+    unilateral: row.unilateral,
+    defaultSets: row.default_sets,
+    defaultRepMin: row.default_rep_min,
+    defaultRepMax: row.default_rep_max,
+    defaultDurationSeconds: row.default_duration_seconds ?? undefined,
+    trackFields: row.track_fields ?? ["time", "distance", "weight", "reps", "effort", "notes"],
+    substitutionGroup: row.substitution_group,
+    demoUrl: row.demo_url ?? "https://www.youtube.com/",
+    instructions: row.instructions ?? "Custom exercise. Use notes to capture details.",
+    difficulty: row.difficulty,
+    equipmentTier: row.equipment_tier,
+    isGlobal: row.is_global
+  };
+}
+
 function mapSession(row: any): WorkoutSession {
   return {
     id: row.id,
@@ -203,6 +263,8 @@ function mapSession(row: any): WorkoutSession {
       durationMinutes: log.duration_minutes,
       distance: log.distance == null ? null : Number(log.distance),
       effort: log.effort == null ? null : Number(log.effort),
+      distanceUnit: log.distance_unit,
+      customValues: log.custom_values,
       notes: log.notes,
       completed: log.completed
     }))
@@ -211,6 +273,21 @@ function mapSession(row: any): WorkoutSession {
 
 export function exerciseName(slug: string) {
   return getExercise(slug)?.name ?? slug;
+}
+
+export function getNextTemplate(templates: WorkoutTemplate[], sessions: WorkoutSession[]) {
+  if (templates.length === 0) return null;
+  const latest = sessions.find((session) => session.status === "completed" && session.templateId);
+  if (!latest) return templates[0];
+  const index = templates.findIndex((template) => template.id === latest.templateId);
+  if (index < 0) return templates[0];
+  return templates[(index + 1) % templates.length];
+}
+
+function compareTemplates(a: WorkoutTemplate, b: WorkoutTemplate) {
+  const aNum = Number(a.dayType.match(/\d+/)?.[0] ?? 0);
+  const bNum = Number(b.dayType.match(/\d+/)?.[0] ?? 0);
+  return aNum - bNum || a.dayType.localeCompare(b.dayType);
 }
 
 export { exercises };

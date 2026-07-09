@@ -23,7 +23,7 @@ export default async function PlanPage() {
       </header>
       <div className="grid gap-4 lg:grid-cols-2">
         {data.templates.map((template) => (
-          <WorkoutCard key={template.id} template={template} equipment={data.equipment} />
+          <WorkoutCard key={template.id} template={template} equipment={data.equipment} exerciseCatalog={data.exerciseCatalog} />
         ))}
       </div>
     </div>

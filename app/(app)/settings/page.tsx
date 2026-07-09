@@ -1,8 +1,11 @@
 import { Check, Database, Shield, UserRound } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { equipmentList } from "@/lib/seed-data";
+import { getAppData } from "@/lib/data";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const data = await getAppData();
+  const missingProfile = Boolean(data.userId && (!data.profile?.sex || !data.profile?.ageRange || !data.profile?.goals.length));
   return (
     <div className="space-y-5">
       <header>
@@ -19,9 +22,18 @@ export default function SettingsPage() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Info label="Mode" value="Me first" />
           <Info label="Units" value="Pounds" />
-          <Info label="Schedule" value="4 days/week" />
+          <Info label="Schedule" value={`${data.profile?.trainingDays ?? 4} days/week`} />
           <Info label="Workout length" value="45-60 minutes" />
+          <Info label="Sex" value={data.profile?.sex ?? "Not set"} />
+          <Info label="Age range" value={data.profile?.ageRange ?? "Not set"} />
+          <Info label="Primary goal" value={data.profile?.primaryGoal?.replace(/_/g, " ") ?? "Not set"} />
+          <Info label="Goals" value={data.profile?.goals.map((goal) => goal.replace(/_/g, " ")).join(", ") || "Not set"} />
         </div>
+        {missingProfile ? (
+          <a className="mt-4 inline-flex min-h-11 items-center rounded-md bg-teal px-4 font-bold text-white" href="/onboarding">
+            Complete profile
+          </a>
+        ) : null}
       </section>
       <section className="rounded-md bg-white p-4 shadow-soft">
         <h2 className="text-lg font-bold">Equipment</h2>

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createGeneratedPlanForUser } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import type { ConditioningLog, Equipment, StrengthSetLog } from "@/lib/types";
+import type { AgeRange, ConditioningLog, Equipment, Goal, Sex, StrengthSetLog, TrackField } from "@/lib/types";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -20,7 +20,14 @@ export async function completeOnboarding(formData: FormData) {
   const { supabase, user } = await requireUser();
   const equipment = formData.getAll("equipment").map(String) as Equipment[];
   const trainingDays = Number(formData.get("trainingDays")) as 3 | 4 | 5 | 6;
-  await createGeneratedPlanForUser(supabase, user.id, equipment.length ? equipment : ["bodyweight"], trainingDays);
+  const goals = formData.getAll("goals").map(String) as Goal[];
+  const primaryGoal = String(formData.get("primaryGoal") ?? "") as Goal;
+  await createGeneratedPlanForUser(supabase, user.id, equipment.length ? equipment : ["bodyweight"], trainingDays, {
+    sex: String(formData.get("sex") ?? "") as Sex,
+    ageRange: String(formData.get("ageRange") ?? "") as AgeRange,
+    goals,
+    primaryGoal: primaryGoal || goals[0] || "general_health"
+  });
   revalidatePath("/");
   redirect("/today");
 }
@@ -75,6 +82,8 @@ export async function saveWorkout(formData: FormData) {
         duration_minutes: log.durationMinutes,
         distance: log.distance,
         effort: log.effort,
+        distance_unit: log.distanceUnit ?? null,
+        custom_values: log.customValues ?? null,
         notes: log.notes,
         completed: true
       }))
@@ -83,7 +92,7 @@ export async function saveWorkout(formData: FormData) {
   }
 
   revalidatePath("/");
-  redirect("/history");
+  redirect("/today");
 }
 
 export async function substituteExercise(formData: FormData) {
@@ -96,5 +105,53 @@ export async function substituteExercise(formData: FormData) {
     .eq("id", templateExerciseId)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
+  revalidatePath("/");
+}
+
+export async function createCustomExerciseAndSubstitute(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const templateExerciseId = String(formData.get("templateExerciseId"));
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("Exercise name is required.");
+  const trackFields = formData.getAll("trackFields").map(String) as TrackField[];
+  const slugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const slug = `custom-${slugBase || "exercise"}-${Date.now()}`;
+  const wantsStrength = trackFields.includes("weight") || trackFields.includes("reps");
+  const wantsDistance = trackFields.includes("distance") && !wantsStrength;
+  const trackType = wantsStrength ? "strength" : wantsDistance ? "distance" : trackFields.includes("time") ? "conditioning" : "custom";
+
+  const { error: insertError } = await supabase.from("exercises").insert({
+    user_id: user.id,
+    slug,
+    name,
+    category: String(formData.get("category") ?? "other"),
+    track_type: trackType,
+    movement_pattern: String(formData.get("movementPattern") ?? "other"),
+    muscle_focus: ["custom"],
+    equipment: [String(formData.get("equipment") ?? "bodyweight")],
+    unilateral: false,
+    default_sets: wantsStrength ? 3 : 1,
+    default_rep_min: wantsStrength ? 8 : 0,
+    default_rep_max: wantsStrength ? 12 : 0,
+    default_duration_seconds: trackFields.includes("time") ? 900 : null,
+    track_fields: trackFields.length ? trackFields : ["notes"],
+    substitution_group: String(formData.get("substitutionGroup") ?? "custom"),
+    demo_url: null,
+    instructions: String(formData.get("notes") ?? ""),
+    difficulty: "beginner",
+    equipment_tier: "bodyweight",
+    is_global: false
+  });
+  if (insertError) throw new Error(insertError.message);
+
+  if (templateExerciseId) {
+    const { error: updateError } = await supabase
+      .from("template_exercises")
+      .update({ exercise_slug: slug })
+      .eq("id", templateExerciseId)
+      .eq("user_id", user.id);
+    if (updateError) throw new Error(updateError.message);
+  }
+
   revalidatePath("/");
 }

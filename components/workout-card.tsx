@@ -1,9 +1,10 @@
 import { Clock, Dumbbell, Repeat2 } from "lucide-react";
-import { getExercise, getSubstitutions } from "@/lib/seed-data";
+import { getExerciseFromCatalog } from "@/lib/exercise-utils";
+import { getSubstitutions } from "@/lib/seed-data";
 import { SubstitutionForm } from "@/components/substitution-form";
-import type { Equipment, WorkoutTemplate } from "@/lib/types";
+import type { Equipment, Exercise, WorkoutTemplate } from "@/lib/types";
 
-export function WorkoutCard({ template, equipment = [] }: { template: WorkoutTemplate; equipment?: Equipment[] }) {
+export function WorkoutCard({ template, equipment = [], exerciseCatalog = [] }: { template: WorkoutTemplate; equipment?: Equipment[]; exerciseCatalog?: Exercise[] }) {
   return (
     <article className="rounded-md bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
@@ -18,7 +19,7 @@ export function WorkoutCard({ template, equipment = [] }: { template: WorkoutTem
       </div>
       <div className="mt-4 space-y-3">
         {template.exercises.map((item) => {
-          const exercise = getExercise(item.exerciseId);
+          const exercise = getExerciseFromCatalog(exerciseCatalog, item.exerciseId);
           if (!exercise) return null;
           const substitutions = getSubstitutions(item.exerciseId, equipment);
           return (
@@ -38,7 +39,7 @@ export function WorkoutCard({ template, equipment = [] }: { template: WorkoutTem
                   Swap: {substitutions.slice(0, 2).map((sub) => sub.name).join(", ")}
                 </p>
               ) : null}
-              <SubstitutionForm templateExerciseId={item.id} exerciseId={item.exerciseId} equipment={equipment} />
+              <SubstitutionForm templateExerciseId={item.id} exerciseId={item.exerciseId} equipment={equipment} exerciseCatalog={exerciseCatalog} />
             </div>
           );
         })}

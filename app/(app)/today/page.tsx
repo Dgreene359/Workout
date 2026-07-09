@@ -8,14 +8,14 @@ import { getProgressSummary } from "@/lib/progress";
 export default async function TodayPage() {
   const data = await getAppData();
   if (data.configured && data.userId && !data.profile?.setupCompleted) redirect("/onboarding");
-  const template = data.templates[0];
+  const template = data.todayTemplate;
   if (!template) redirect("/onboarding");
   const summary = getProgressSummary(data.sessions);
 
   return (
     <div className="space-y-5">
       <header className="rounded-md bg-ink p-5 text-white shadow-soft">
-        <p className="text-xs font-bold uppercase text-citron">Today</p>
+        <p className="text-xs font-bold uppercase text-citron">Next up</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal">{template.name}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">{template.summary}</p>
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -29,7 +29,7 @@ export default async function TodayPage() {
         <StatCard label="Volume" value={`${Math.round(summary.totalVolume / 100) / 10}k`} />
         <StatCard label="Cardio" value={`${summary.cardioMinutes}m`} />
       </div>
-      <SessionLogger template={template} sessions={data.sessions} />
+      <SessionLogger template={template} sessions={data.sessions} exerciseCatalog={data.exerciseCatalog} />
     </div>
   );
 }

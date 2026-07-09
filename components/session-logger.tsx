@@ -3,25 +3,33 @@
 import { useMemo, useState } from "react";
 import { Check, ExternalLink, Minus, Plus, Save } from "lucide-react";
 import { saveWorkout } from "@/app/actions";
+import { getExerciseFromCatalog } from "@/lib/exercise-utils";
 import { getLastStrengthValues } from "@/lib/log-utils";
-import { getExercise } from "@/lib/seed-data";
 import { getProgressionHint } from "@/lib/progress";
-import type { ConditioningLog, StrengthSetLog, WorkoutSession, WorkoutTemplate } from "@/lib/types";
+import type { ConditioningLog, Exercise, StrengthSetLog, WorkoutSession, WorkoutTemplate } from "@/lib/types";
 
-export function SessionLogger({ template, sessions }: { template: WorkoutTemplate; sessions: WorkoutSession[] }) {
+export function SessionLogger({
+  template,
+  sessions,
+  exerciseCatalog
+}: {
+  template: WorkoutTemplate;
+  sessions: WorkoutSession[];
+  exerciseCatalog: Exercise[];
+}) {
   const [notes, setNotes] = useState("");
-  const [strengthLogs, setStrengthLogs] = useState<StrengthSetLog[]>(() => buildStrengthLogs(template, sessions));
-  const [conditioningLogs, setConditioningLogs] = useState<ConditioningLog[]>(() => buildConditioningLogs(template));
+  const [strengthLogs, setStrengthLogs] = useState<StrengthSetLog[]>(() => buildStrengthLogs(template, sessions, exerciseCatalog));
+  const [conditioningLogs, setConditioningLogs] = useState<ConditioningLog[]>(() => buildConditioningLogs(template, exerciseCatalog));
 
   const grouped = useMemo(
     () =>
       template.exercises.map((entry) => ({
         entry,
-        exercise: getExercise(entry.exerciseId),
+        exercise: getExerciseFromCatalog(exerciseCatalog, entry.exerciseId),
         strength: strengthLogs.filter((log) => log.exerciseId === entry.exerciseId),
         conditioning: conditioningLogs.find((log) => log.exerciseId === entry.exerciseId)
       })),
-    [conditioningLogs, strengthLogs, template.exercises]
+    [conditioningLogs, exerciseCatalog, strengthLogs, template.exercises]
   );
 
   function adjustStrength(id: string, field: "weight" | "reps" | "rpe", delta: number) {
@@ -56,7 +64,7 @@ export function SessionLogger({ template, sessions }: { template: WorkoutTemplat
       <input type="hidden" name="conditioningLogs" value={JSON.stringify(conditioningLogs)} />
       {grouped.map(({ entry, exercise, strength, conditioning }) => {
         if (!exercise) return null;
-        const isConditioning = exercise.trackType === "conditioning";
+        const isConditioning = exercise.trackType !== "strength" || !exercise.trackFields.includes("weight") || !exercise.trackFields.includes("reps");
         return (
           <section key={`${entry.id ?? entry.exerciseId}-${entry.orderIndex}`} className="rounded-md bg-white p-4 shadow-soft">
             <div className="flex items-start justify-between gap-3">
@@ -136,6 +144,10 @@ function ConditioningInputs({ log, onChange }: { log: ConditioningLog; onChange:
           <input className="mt-1 min-h-11 w-full rounded-md border border-ink/10 bg-paper px-3 outline-none focus:border-teal" type="number" min={0} max={10} value={log.effort ?? ""} onChange={(event) => onChange({ effort: event.target.value ? Number(event.target.value) : null })} />
         </label>
       </div>
+      <label className="block">
+        <span className="text-xs font-bold uppercase text-ink/50">Notes</span>
+        <textarea className="mt-1 min-h-20 w-full rounded-md border border-ink/10 bg-paper p-3 outline-none focus:border-teal" value={log.notes ?? ""} onChange={(event) => onChange({ notes: event.target.value })} placeholder="Stroke type, route, class notes, substitutions, or details" />
+      </label>
     </div>
   );
 }
@@ -171,10 +183,10 @@ function NumberControl({
   );
 }
 
-function buildStrengthLogs(template: WorkoutTemplate, sessions: WorkoutSession[]): StrengthSetLog[] {
+function buildStrengthLogs(template: WorkoutTemplate, sessions: WorkoutSession[], exerciseCatalog: Exercise[]): StrengthSetLog[] {
   return template.exercises.flatMap((entry) => {
-    const exercise = getExercise(entry.exerciseId);
-    if (!exercise || exercise.trackType === "conditioning") return [];
+    const exercise = getExerciseFromCatalog(exerciseCatalog, entry.exerciseId);
+    if (!exercise || exercise.trackType !== "strength" || !exercise.trackFields.includes("weight") || !exercise.trackFields.includes("reps")) return [];
     const last = getLastStrengthValues(sessions, exercise.id);
     return Array.from({ length: entry.sets }, (_, index) => ({
       id: `${entry.id ?? entry.exerciseId}-${index + 1}`,
@@ -188,10 +200,10 @@ function buildStrengthLogs(template: WorkoutTemplate, sessions: WorkoutSession[]
   });
 }
 
-function buildConditioningLogs(template: WorkoutTemplate): ConditioningLog[] {
+function buildConditioningLogs(template: WorkoutTemplate, exerciseCatalog: Exercise[]): ConditioningLog[] {
   return template.exercises.flatMap((entry) => {
-    const exercise = getExercise(entry.exerciseId);
-    if (!exercise || exercise.trackType !== "conditioning") return [];
+    const exercise = getExerciseFromCatalog(exerciseCatalog, entry.exerciseId);
+    if (!exercise || (exercise.trackType === "strength" && exercise.trackFields.includes("weight") && exercise.trackFields.includes("reps"))) return [];
     return [
       {
         id: `${entry.id ?? entry.exerciseId}-conditioning`,

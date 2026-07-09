@@ -1,4 +1,4 @@
-import type { Equipment, Exercise, GeneratedPlan, PlanGenerationInput, TemplateExercise, WorkoutTemplate } from "@/lib/types";
+import type { Equipment, Exercise, GeneratedPlan, PlanGenerationInput, TemplateExercise, TrackField, WorkoutTemplate } from "@/lib/types";
 
 export const equipmentList: Equipment[] = [
   "bodyweight",
@@ -18,11 +18,21 @@ export const equipmentList: Equipment[] = [
 
 const yt = (query: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(`${query} form tutorial`)}`;
 
-function exercise(input: Omit<Exercise, "id" | "isGlobal" | "demoUrl"> & { demoUrl?: string }): Exercise {
+function defaultTrackFields(trackType: Exercise["trackType"]): TrackField[] {
+  if (trackType === "strength") return ["weight", "reps", "effort", "notes"];
+  if (trackType === "conditioning") return ["time", "distance", "effort", "notes"];
+  if (trackType === "distance") return ["distance", "time", "effort", "notes"];
+  if (trackType === "carry") return ["time", "distance", "weight", "effort", "notes"];
+  if (trackType === "mobility") return ["time", "notes"];
+  return ["time", "distance", "weight", "reps", "effort", "notes"];
+}
+
+function exercise(input: Omit<Exercise, "id" | "isGlobal" | "demoUrl" | "trackFields"> & { demoUrl?: string; trackFields?: TrackField[] }): Exercise {
   return {
     ...input,
     id: input.slug,
     demoUrl: input.demoUrl ?? yt(input.name),
+    trackFields: input.trackFields ?? defaultTrackFields(input.trackType),
     isGlobal: true
   };
 }
@@ -475,6 +485,203 @@ export const exercises: Exercise[] = [
     instructions: "Move slowly through hips, shoulders, and upper back without forcing end ranges.",
     difficulty: "beginner",
     equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "walking",
+    name: "Walking",
+    category: "conditioning",
+    trackType: "conditioning",
+    movementPattern: "cardio",
+    muscleFocus: ["aerobic base"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 10,
+    defaultRepMax: 45,
+    defaultDurationSeconds: 1800,
+    substitutionGroup: "conditioning",
+    instructions: "Use a sustainable pace and log time, distance if known, and effort.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "swimming",
+    name: "Swimming",
+    category: "conditioning",
+    trackType: "distance",
+    movementPattern: "cardio",
+    muscleFocus: ["conditioning", "shoulders", "core"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 10,
+    defaultRepMax: 45,
+    defaultDurationSeconds: 1800,
+    substitutionGroup: "conditioning",
+    instructions: "Log stroke or workout type in notes, plus time and distance when available.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "hiking",
+    name: "Hiking",
+    category: "conditioning",
+    trackType: "distance",
+    movementPattern: "cardio",
+    muscleFocus: ["conditioning", "legs"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 20,
+    defaultRepMax: 90,
+    defaultDurationSeconds: 3600,
+    substitutionGroup: "conditioning",
+    instructions: "Track time, distance, elevation in notes, and overall effort.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "yoga",
+    name: "Yoga",
+    category: "mobility",
+    trackType: "mobility",
+    movementPattern: "mobility",
+    muscleFocus: ["mobility", "breathing", "control"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 10,
+    defaultRepMax: 45,
+    defaultDurationSeconds: 1800,
+    substitutionGroup: "mobility",
+    instructions: "Log style, duration, and any focus areas in notes.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "pilates",
+    name: "Pilates",
+    category: "core",
+    trackType: "mobility",
+    movementPattern: "core control",
+    muscleFocus: ["core", "mobility"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 10,
+    defaultRepMax: 45,
+    defaultDurationSeconds: 1800,
+    substitutionGroup: "core-brace",
+    instructions: "Log duration, class type, and any notable movements.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "stretching",
+    name: "Stretching",
+    category: "mobility",
+    trackType: "mobility",
+    movementPattern: "mobility",
+    muscleFocus: ["mobility"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 5,
+    defaultRepMax: 30,
+    defaultDurationSeconds: 900,
+    substitutionGroup: "mobility",
+    instructions: "Log target areas and duration.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "jump-rope",
+    name: "Jump Rope",
+    category: "conditioning",
+    trackType: "conditioning",
+    movementPattern: "cardio",
+    muscleFocus: ["conditioning", "calves"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 5,
+    defaultRepMax: 20,
+    defaultDurationSeconds: 600,
+    substitutionGroup: "conditioning",
+    instructions: "Track intervals, total time, and effort.",
+    difficulty: "intermediate",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "elliptical",
+    name: "Elliptical",
+    category: "conditioning",
+    trackType: "conditioning",
+    movementPattern: "cardio",
+    muscleFocus: ["conditioning"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 10,
+    defaultRepMax: 45,
+    defaultDurationSeconds: 1800,
+    substitutionGroup: "conditioning",
+    instructions: "Track duration, distance if shown, resistance in notes, and effort.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "stairs",
+    name: "Stairs",
+    category: "conditioning",
+    trackType: "conditioning",
+    movementPattern: "cardio",
+    muscleFocus: ["conditioning", "legs"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 1,
+    defaultRepMin: 5,
+    defaultRepMax: 30,
+    defaultDurationSeconds: 900,
+    substitutionGroup: "conditioning",
+    instructions: "Track duration, floors if known, and effort.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
+  }),
+  exercise({
+    slug: "sled-push",
+    name: "Sled Push",
+    category: "conditioning",
+    trackType: "carry",
+    movementPattern: "loaded locomotion",
+    muscleFocus: ["legs", "conditioning"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 4,
+    defaultRepMin: 20,
+    defaultRepMax: 40,
+    defaultDurationSeconds: 120,
+    substitutionGroup: "conditioning",
+    instructions: "Track distance, load in notes or weight, and effort.",
+    difficulty: "intermediate",
+    equipmentTier: "minimal"
+  }),
+  exercise({
+    slug: "custom-strength-placeholder",
+    name: "Custom Strength Movement",
+    category: "other",
+    trackType: "custom",
+    movementPattern: "other",
+    muscleFocus: ["custom"],
+    equipment: ["bodyweight"],
+    unilateral: false,
+    defaultSets: 3,
+    defaultRepMin: 8,
+    defaultRepMax: 12,
+    substitutionGroup: "custom",
+    instructions: "Use this as a placeholder when the exact movement is not in the library.",
+    difficulty: "beginner",
+    equipmentTier: "bodyweight"
   })
 ];
 
@@ -493,7 +700,12 @@ export function getSubstitutions(exerciseId: string, userEquipment: Equipment[] 
   const current = getExercise(exerciseId);
   if (!current) return [];
   return getAvailableExercises(userEquipment).filter(
-    (candidate) => candidate.substitutionGroup === current.substitutionGroup && candidate.id !== current.id
+    (candidate) =>
+      candidate.id !== current.id &&
+      (candidate.substitutionGroup === current.substitutionGroup ||
+        candidate.movementPattern === current.movementPattern ||
+        candidate.trackType === current.trackType ||
+        candidate.substitutionGroup === "custom")
   );
 }
 
@@ -538,6 +750,7 @@ function template(slug: string, trainingDays: 3 | 4 | 5 | 6, dayType: string, na
 
 export function generatePlan(input: PlanGenerationInput): GeneratedPlan {
   const equipment = Array.from(new Set<Equipment>(["bodyweight", ...input.equipment]));
+  const primaryGoal = input.primaryGoal ?? input.goals?.[0] ?? "general_health";
   const squat = choose(equipment, ["back-squat", "goblet-squat", "bodyweight-squat"], "bodyweight-squat");
   const hinge = choose(equipment, ["romanian-deadlift", "kettlebell-deadlift"], "reverse-lunge");
   const push = choose(equipment, ["bench-press", "dumbbell-floor-press", "push-up"], "push-up");
@@ -547,13 +760,17 @@ export function generatePlan(input: PlanGenerationInput): GeneratedPlan {
   const carry = choose(equipment, ["farmer-carry", "plank"], "plank");
   const singleLeg = choose(equipment, ["box-step-up", "reverse-lunge"], "reverse-lunge");
 
+  const conditioningFirst = primaryGoal === "fat_loss" || primaryGoal === "conditioning";
+  const mobilityFirst = primaryGoal === "mobility" || primaryGoal === "injury_recovery";
+  const strengthVolume = primaryGoal === "gain_strength" || primaryGoal === "build_muscle";
+
   const library = [
     template("generated-day-1", input.trainingDays, "Day 1", "Full Body Strength", "Squat, push, pull, and core baseline.", [
       squat,
       push,
       pull,
       carry,
-      "hip-shoulder-mobility"
+      mobilityFirst ? "stretching" : "hip-shoulder-mobility"
     ]),
     template("generated-day-2", input.trainingDays, "Day 2", "Hinge + Conditioning", "Posterior chain work with time-based conditioning.", [
       hinge,
@@ -566,14 +783,14 @@ export function generatePlan(input: PlanGenerationInput): GeneratedPlan {
       squat,
       verticalPush,
       pull,
-      "cossack-squat",
+      strengthVolume ? hinge : "cossack-squat",
       carry
     ]),
     template("generated-day-4", input.trainingDays, "Day 4", "Upper + Lower Assistance", "Upper strength, single-leg work, and easy conditioning.", [
       push,
       pull,
       singleLeg,
-      conditioning,
+      conditioningFirst ? conditioning : carry,
       "hip-shoulder-mobility"
     ]),
     template("generated-day-5", input.trainingDays, "Day 5", "Power + Core", "Kettlebell or bodyweight power with trunk work.", [
@@ -581,13 +798,13 @@ export function generatePlan(input: PlanGenerationInput): GeneratedPlan {
       push,
       pull,
       carry,
-      conditioning
+      conditioningFirst ? conditioning : "plank"
     ]),
     template("generated-day-6", input.trainingDays, "Day 6", "Conditioning + Mobility", "Aerobic work, mobility, and low-fatigue accessories.", [
-      conditioning,
+      conditioningFirst ? conditioning : choose(equipment, ["walking", "treadmill", "bike"], "walking"),
       singleLeg,
       "plank",
-      "hip-shoulder-mobility"
+      mobilityFirst ? "yoga" : "hip-shoulder-mobility"
     ])
   ];
 

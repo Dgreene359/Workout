@@ -1,4 +1,8 @@
-export type TrackType = "strength" | "conditioning" | "mobility" | "carry";
+export type TrackType = "strength" | "conditioning" | "mobility" | "carry" | "distance" | "custom";
+export type TrackField = "time" | "distance" | "weight" | "reps" | "effort" | "notes";
+export type Sex = "male" | "female";
+export type AgeRange = "18-24" | "25-34" | "35-44" | "45-54" | "55-64" | "65+";
+export type Goal = "gain_strength" | "build_muscle" | "fat_loss" | "mobility" | "conditioning" | "injury_recovery" | "general_health";
 
 export type ExerciseCategory =
   | "lower"
@@ -7,7 +11,8 @@ export type ExerciseCategory =
   | "full_body"
   | "core"
   | "conditioning"
-  | "mobility";
+  | "mobility"
+  | "other";
 
 export type Equipment =
   | "bodyweight"
@@ -42,6 +47,7 @@ export type Exercise = {
   defaultRepMin: number;
   defaultRepMax: number;
   defaultDurationSeconds?: number;
+  trackFields: TrackField[];
   substitutionGroup: string;
   demoUrl: string;
   instructions: string;
@@ -78,6 +84,8 @@ export type WorkoutTemplate = {
 export type PlanGenerationInput = {
   equipment: Equipment[];
   trainingDays: 3 | 4 | 5 | 6;
+  goals?: Goal[];
+  primaryGoal?: Goal | null;
 };
 
 export type GeneratedPlan = {
@@ -108,6 +116,8 @@ export type ConditioningLog = {
   durationMinutes: number;
   distance?: number | null;
   effort?: number | null;
+  distanceUnit?: string | null;
+  customValues?: Record<string, string | number | boolean | null> | null;
   notes?: string | null;
   completed: boolean;
 };

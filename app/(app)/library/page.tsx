@@ -4,7 +4,9 @@ import { getAvailableExercises } from "@/lib/seed-data";
 
 export default async function LibraryPage() {
   const data = await getAppData();
-  const available = getAvailableExercises(data.equipment.length ? data.equipment : ["bodyweight"]);
+  const staticAvailable = getAvailableExercises(data.equipment.length ? data.equipment : ["bodyweight"]);
+  const custom = data.exerciseCatalog.filter((exercise) => !exercise.isGlobal);
+  const available = [...staticAvailable, ...custom.filter((exercise) => !staticAvailable.some((item) => item.id === exercise.id))];
 
   return (
     <div className="space-y-5">
@@ -12,7 +14,7 @@ export default async function LibraryPage() {
         <p className="text-xs font-bold uppercase text-clay">Exercise library</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal">Movements and demos</h1>
         <p className="mt-2 text-sm leading-6 text-ink/70">
-          Exercises are filtered to your selected equipment. Each movement includes form notes and a YouTube demo link.
+          Exercises are filtered to your selected equipment and include your custom placeholders.
         </p>
       </header>
       <div className="grid gap-3 md:grid-cols-2">
@@ -23,12 +25,16 @@ export default async function LibraryPage() {
                 <p className="text-xs font-bold uppercase text-moss">{exercise.trackType}</p>
                 <h2 className="mt-1 text-lg font-bold">{exercise.name}</h2>
               </div>
-              <a className="flex h-10 w-10 items-center justify-center rounded-md bg-paper text-teal" href={exercise.demoUrl} target="_blank" rel="noreferrer" aria-label={`Open ${exercise.name} demo`}>
-                <ExternalLink size={18} />
-              </a>
+              {exercise.demoUrl ? (
+                <a className="flex h-10 w-10 items-center justify-center rounded-md bg-paper text-teal" href={exercise.demoUrl} target="_blank" rel="noreferrer" aria-label={`Open ${exercise.name} demo`}>
+                  <ExternalLink size={18} />
+                </a>
+              ) : null}
             </div>
             <p className="mt-3 text-sm leading-6 text-ink/70">{exercise.instructions}</p>
-            <p className="mt-3 text-xs font-semibold capitalize text-ink/50">{exercise.equipment.join(", ")}</p>
+            <p className="mt-3 text-xs font-semibold capitalize text-ink/50">
+              {exercise.isGlobal ? "Library" : "Custom"} · {exercise.trackFields.join(", ")}
+            </p>
           </article>
         ))}
       </div>
