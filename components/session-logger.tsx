@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ExternalLink, Minus, Plus, Save } from "lucide-react";
-import { saveWorkout } from "@/app/actions";
+import { Check, ExternalLink, Minus, Plus, Save, Trash2 } from "lucide-react";
+import { saveWorkout, updateWorkout } from "@/app/actions";
 import { getExerciseFromCatalog } from "@/lib/exercise-utils";
 import { getLastStrengthValues } from "@/lib/log-utils";
 import { getProgressionHint } from "@/lib/progress";
@@ -11,24 +11,50 @@ import type { ConditioningLog, Exercise, StrengthSetLog, WorkoutSession, Workout
 export function SessionLogger({
   template,
   sessions,
-  exerciseCatalog
+  exerciseCatalog,
+  mode = "create",
+  session
 }: {
   template: WorkoutTemplate;
   sessions: WorkoutSession[];
   exerciseCatalog: Exercise[];
+  mode?: "create" | "edit";
+  session?: WorkoutSession;
 }) {
-  const [notes, setNotes] = useState("");
-  const [strengthLogs, setStrengthLogs] = useState<StrengthSetLog[]>(() => buildStrengthLogs(template, sessions, exerciseCatalog));
-  const [conditioningLogs, setConditioningLogs] = useState<ConditioningLog[]>(() => buildConditioningLogs(template, exerciseCatalog));
+  const isEditing = mode === "edit";
+  const [notes, setNotes] = useState(session?.notes ?? "");
+  const [sessionDate, setSessionDate] = useState(session?.date ?? new Date().toISOString().slice(0, 10));
+  const [strengthLogs, setStrengthLogs] = useState<StrengthSetLog[]>(() => (session ? sortStrengthLogs(session.strengthLogs) : buildStrengthLogs(template, sessions, exerciseCatalog)));
+  const [conditioningLogs, setConditioningLogs] = useState<ConditioningLog[]>(() => (session ? session.conditioningLogs : buildConditioningLogs(template, exerciseCatalog)));
 
   const grouped = useMemo(
-    () =>
-      template.exercises.map((entry) => ({
+    () => {
+      const loggedExerciseIds = [...strengthLogs.map((log) => log.exerciseId), ...conditioningLogs.map((log) => log.exerciseId)];
+      const extraEntries = loggedExerciseIds
+        .filter((exerciseId, index, list) => list.indexOf(exerciseId) === index)
+        .filter((exerciseId) => !template.exercises.some((entry) => entry.exerciseId === exerciseId))
+        .map((exerciseId, index) => {
+          const exercise = getExerciseFromCatalog(exerciseCatalog, exerciseId);
+          return {
+            exerciseId,
+            orderIndex: template.exercises.length + index + 1,
+            block: exercise?.trackType === "strength" ? "accessory" : "conditioning",
+            sets: exercise?.defaultSets ?? 1,
+            repMin: exercise?.defaultRepMin,
+            repMax: exercise?.defaultRepMax,
+            durationSeconds: exercise?.defaultDurationSeconds,
+            targetRpe: 7,
+            restSeconds: 60
+          } as WorkoutTemplate["exercises"][number];
+        });
+
+      return [...template.exercises, ...extraEntries].map((entry) => ({
         entry,
         exercise: getExerciseFromCatalog(exerciseCatalog, entry.exerciseId),
         strength: strengthLogs.filter((log) => log.exerciseId === entry.exerciseId),
         conditioning: conditioningLogs.find((log) => log.exerciseId === entry.exerciseId)
-      })),
+      }));
+    },
     [conditioningLogs, exerciseCatalog, strengthLogs, template.exercises]
   );
 
@@ -53,15 +79,74 @@ export function SessionLogger({
     setStrengthLogs((current) => current.map((log) => (log.id === id ? { ...log, completed: !log.completed } : log)));
   }
 
+  function addStrengthSet(exercise: Exercise, entry: WorkoutTemplate["exercises"][number]) {
+    setStrengthLogs((current) => {
+      const existing = current.filter((log) => log.exerciseId === exercise.id).sort((a, b) => a.setNumber - b.setNumber);
+      const last = existing[existing.length - 1];
+      return [
+        ...current,
+        {
+          id: `${exercise.id}-extra-${Date.now()}`,
+          exerciseId: exercise.id,
+          setNumber: existing.length + 1,
+          weight: last?.weight ?? 0,
+          reps: last?.reps ?? entry.repMin ?? exercise.defaultRepMin,
+          rpe: last?.rpe ?? entry.targetRpe,
+          completed: true
+        }
+      ];
+    });
+  }
+
+  function removeStrength(id: string, exerciseId: string) {
+    setStrengthLogs((current) =>
+      current
+        .filter((log) => log.id !== id)
+        .map((log) => {
+          if (log.exerciseId !== exerciseId) return log;
+          const remainingForExercise = current.filter((item) => item.id !== id && item.exerciseId === exerciseId);
+          const nextNumber = remainingForExercise.findIndex((item) => item.id === log.id) + 1;
+          return { ...log, setNumber: nextNumber || log.setNumber };
+        })
+    );
+  }
+
   function updateConditioning(exerciseId: string, patch: Partial<ConditioningLog>) {
     setConditioningLogs((current) => current.map((log) => (log.exerciseId === exerciseId ? { ...log, ...patch } : log)));
   }
 
+  function addConditioningLog(exercise: Exercise, entry: WorkoutTemplate["exercises"][number]) {
+    setConditioningLogs((current) => [
+      ...current,
+      {
+        id: `${exercise.id}-conditioning-${Date.now()}`,
+        exerciseId: exercise.id,
+        durationMinutes: Math.round((entry.durationSeconds ?? exercise.defaultDurationSeconds ?? 900) / 60),
+        distance: null,
+        effort: entry.targetRpe,
+        notes: null,
+        completed: true
+      }
+    ]);
+  }
+
+  function removeConditioningLog(exerciseId: string) {
+    setConditioningLogs((current) => current.filter((log) => log.exerciseId !== exerciseId));
+  }
+
   return (
-    <form action={saveWorkout} className="space-y-4">
+    <form action={isEditing ? updateWorkout : saveWorkout} className="space-y-4">
+      {session ? <input type="hidden" name="sessionId" value={session.id} /> : null}
       <input type="hidden" name="templateId" value={template.id} />
+      <input type="hidden" name="sessionDate" value={sessionDate} />
       <input type="hidden" name="strengthLogs" value={JSON.stringify(strengthLogs)} />
       <input type="hidden" name="conditioningLogs" value={JSON.stringify(conditioningLogs)} />
+      {isEditing ? (
+        <label className="block rounded-md bg-white p-4 shadow-soft">
+          <span className="text-sm font-bold">Workout date</span>
+          <input className="mt-2 min-h-11 w-full rounded-md border border-ink/10 bg-paper px-3 outline-none focus:border-teal" type="date" value={sessionDate} onChange={(event) => setSessionDate(event.target.value)} />
+        </label>
+      ) : null}
       {grouped.map(({ entry, exercise, strength, conditioning }) => {
         if (!exercise) return null;
         const isConditioning = exercise.trackType !== "strength" || !exercise.trackFields.includes("weight") || !exercise.trackFields.includes("reps");
@@ -85,7 +170,20 @@ export function SessionLogger({
               {isConditioning ? exercise.instructions : getProgressionHint(exercise.id, sessions, entry.repMax)}
             </p>
             {isConditioning && conditioning ? (
-              <ConditioningInputs log={conditioning} onChange={(patch) => updateConditioning(exercise.id, patch)} />
+              <>
+                <ConditioningInputs log={conditioning} onChange={(patch) => updateConditioning(exercise.id, patch)} />
+                {isEditing ? (
+                  <button type="button" className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-bold text-ink/70" onClick={() => removeConditioningLog(exercise.id)}>
+                    <Trash2 size={16} />
+                    Remove log
+                  </button>
+                ) : null}
+              </>
+            ) : isConditioning && isEditing ? (
+              <button type="button" className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-paper px-3 text-sm font-bold text-teal" onClick={() => addConditioningLog(exercise, entry)}>
+                <Plus size={16} />
+                Add log
+              </button>
             ) : (
               <div className="mt-4 space-y-3">
                 {strength.map((log) => (
@@ -108,8 +206,20 @@ export function SessionLogger({
                       <NumberControl label="reps" value={log.reps} step={1} onChange={(value) => updateStrength(log.id, "reps", value)} onMinus={() => adjustStrength(log.id, "reps", -1)} onPlus={() => adjustStrength(log.id, "reps", 1)} />
                       <NumberControl label="RPE" value={log.rpe} step={1} onChange={(value) => updateStrength(log.id, "rpe", value)} onMinus={() => adjustStrength(log.id, "rpe", -1)} onPlus={() => adjustStrength(log.id, "rpe", 1)} />
                     </div>
+                    {isEditing ? (
+                      <button type="button" className="mt-3 flex min-h-9 w-full items-center justify-center gap-2 rounded-md bg-paper px-3 text-sm font-bold text-ink/60" onClick={() => removeStrength(log.id, exercise.id)}>
+                        <Trash2 size={15} />
+                        Remove set
+                      </button>
+                    ) : null}
                   </div>
                 ))}
+                {isEditing ? (
+                  <button type="button" className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-paper px-3 text-sm font-bold text-teal" onClick={() => addStrengthSet(exercise, entry)}>
+                    <Plus size={16} />
+                    Add set
+                  </button>
+                ) : null}
               </div>
             )}
           </section>
@@ -121,7 +231,7 @@ export function SessionLogger({
       </label>
       <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-ink px-4 font-bold text-white shadow-soft">
         <Save size={18} />
-        Save workout
+        {isEditing ? "Save changes" : "Save workout"}
       </button>
     </form>
   );
@@ -198,6 +308,10 @@ function buildStrengthLogs(template: WorkoutTemplate, sessions: WorkoutSession[]
       completed: false
     }));
   });
+}
+
+function sortStrengthLogs(logs: StrengthSetLog[]) {
+  return [...logs].sort((a, b) => a.exerciseId.localeCompare(b.exerciseId) || a.setNumber - b.setNumber);
 }
 
 function buildConditioningLogs(template: WorkoutTemplate, exerciseCatalog: Exercise[]): ConditioningLog[] {

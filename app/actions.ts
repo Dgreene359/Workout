@@ -95,6 +95,88 @@ export async function saveWorkout(formData: FormData) {
   redirect("/today");
 }
 
+export async function updateWorkout(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const sessionId = String(formData.get("sessionId"));
+  const templateId = String(formData.get("templateId"));
+  const sessionDate = String(formData.get("sessionDate"));
+  const notes = String(formData.get("notes") ?? "");
+  const strengthLogs = JSON.parse(String(formData.get("strengthLogs") ?? "[]")) as StrengthSetLog[];
+  const conditioningLogs = JSON.parse(String(formData.get("conditioningLogs") ?? "[]")) as ConditioningLog[];
+
+  const { data: existing, error: existingError } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingError) throw new Error(existingError.message);
+  if (!existing) throw new Error("Workout not found.");
+
+  const { error: sessionError } = await supabase
+    .from("workout_sessions")
+    .update({
+      template_id: templateId || null,
+      session_date: sessionDate || new Date().toISOString().slice(0, 10),
+      status: "completed",
+      notes,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", sessionId)
+    .eq("user_id", user.id);
+
+  if (sessionError) throw new Error(sessionError.message);
+
+  const [{ error: deleteSetError }, { error: deleteCardioError }] = await Promise.all([
+    supabase.from("set_logs").delete().eq("session_id", sessionId).eq("user_id", user.id),
+    supabase.from("cardio_logs").delete().eq("session_id", sessionId).eq("user_id", user.id)
+  ]);
+
+  if (deleteSetError) throw new Error(deleteSetError.message);
+  if (deleteCardioError) throw new Error(deleteCardioError.message);
+
+  const completedStrength = strengthLogs.filter((log) => log.completed);
+  if (completedStrength.length > 0) {
+    const { error: setError } = await supabase.from("set_logs").insert(
+      completedStrength.map((log) => ({
+        user_id: user.id,
+        session_id: sessionId,
+        exercise_slug: log.exerciseId,
+        set_number: log.setNumber,
+        weight: log.weight,
+        reps: log.reps,
+        rpe: log.rpe,
+        completed: true
+      }))
+    );
+    if (setError) throw new Error(setError.message);
+  }
+
+  const completedConditioning = conditioningLogs.filter((log) => log.completed && log.durationMinutes > 0);
+  if (completedConditioning.length > 0) {
+    const { error: cardioError } = await supabase.from("cardio_logs").insert(
+      completedConditioning.map((log) => ({
+        user_id: user.id,
+        session_id: sessionId,
+        exercise_slug: log.exerciseId,
+        modality: log.exerciseId,
+        duration_minutes: log.durationMinutes,
+        distance: log.distance,
+        effort: log.effort,
+        distance_unit: log.distanceUnit ?? null,
+        custom_values: log.customValues ?? null,
+        notes: log.notes,
+        completed: true
+      }))
+    );
+    if (cardioError) throw new Error(cardioError.message);
+  }
+
+  revalidatePath("/");
+  redirect("/history");
+}
+
 export async function substituteExercise(formData: FormData) {
   const { supabase, user } = await requireUser();
   const templateExerciseId = String(formData.get("templateExerciseId"));
